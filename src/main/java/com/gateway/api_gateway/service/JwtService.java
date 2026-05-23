@@ -2,7 +2,6 @@ package com.gateway.api_gateway.service;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,10 +20,12 @@ public class JwtService {
     @Value("${jwt.expiration.ms}")
     private Long expirationMs;
 
+    //creates the secret key
     public Key key() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
+    //generate Jwt Token
     public String generateToken(String Username){
         Date now=new Date();
         Date expiry=new Date(now.getTime()+expirationMs);
@@ -36,6 +37,7 @@ public class JwtService {
         .compact();
     }
 
+    //extracts username from generated Jwt Token
     public String extractUsername(String token){
         return Jwts.parser()
                 .verifyWith((SecretKey) key())
@@ -45,6 +47,7 @@ public class JwtService {
                 .getSubject();
     }
 
+    //validate the Jwt Token
     public boolean validateToken(String token){
         try{
             Jwts.parser()
