@@ -27,19 +27,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path=request.getRequestURI();
-        if(path.equals("/auth/login") || path.equals("/dashboard") || path.startsWith("/css") ||path.startsWith("/js")){
-            filterChain.doFilter(request,response);
-            return;
-        }
+        boolean publicPath = path.equals("/auth/login") ||
+                path.equals("/dashboard") ||
+                path.startsWith("/api/analytics") ||
+                path.startsWith("/css") ||
+                path.startsWith("/js");
 
-        //Get Token from header
         String authHeader=request.getHeader("Authorization");
-        if(authHeader==null || !authHeader.startsWith("Bearer")){
+        // Expect header of form: "Bearer <token>" — require the space to avoid substring errors
+        if(authHeader==null || !authHeader.startsWith("Bearer ")){
+            if(publicPath){
+                filterChain.doFilter(request,response);
+                return;
+            }
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED,"Missing or Invalid Token");
             return;
         }
 
-        //Extract Token
         String token=authHeader.substring(7);
         if(!jwtService.validateToken(token)){
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED,"Invalid Token");

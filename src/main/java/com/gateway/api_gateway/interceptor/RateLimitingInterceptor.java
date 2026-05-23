@@ -3,6 +3,8 @@ package com.gateway.api_gateway.interceptor;
 import com.gateway.api_gateway.service.RateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -14,12 +16,12 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
 
     @Value("${rate.limit.user.capacity:100}")
     private int userCapacity;
-    @Value("${rate.limit.user.refill:20}")
-    private int userRefill;
+    @Value("${rate.limit.user.refill:5}")
+    private int userRefillInterval;
     @Value("${rate.limit.ip.capacity:50}")
     private int ipCapacity;
     @Value("${rate.limit.ip.refill:10}")
-    private int ipRefill;
+    private int ipRefillInterval;
 
     public RateLimitingInterceptor(RateLimiterService rateLimiterService) {
         this.rateLimiterService = rateLimiterService;
@@ -27,14 +29,20 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        String userId = (String) request.getAttribute("userId"); // set in JWT filter
+        String userId = (String) request.getAttribute("userId"); // may be set in JWT filter
+        if (userId == null) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.isAuthenticated()) {
+                userId = authentication.getName();
+            }
+        }
         if (userId == null) userId = "anonymous";
 
         String clientIp = getClientIp(request);
 
         // User-level rate limit
         String userKey = "rate:user:" + userId;
-        if (!rateLimiterService.allowRequest(userKey, userCapacity, userRefill)) {
+        if (!rateLimiterService.allowRequest(userKey, userCapacity, userRefillInterval)) {
             response.setStatus(429);
             response.getWriter().write("Rate limit exceeded for user");
             return false;
@@ -42,7 +50,7 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
 
         // IP-level throttling
         String ipKey = "rate:ip:" + clientIp;
-        if (!rateLimiterService.allowRequest(ipKey, ipCapacity, ipRefill)) {
+        if (!rateLimiterService.allowRequest(ipKey, ipCapacity, ipRefillInterval)) {
             response.setStatus(429);
             response.getWriter().write("Rate limit exceeded for IP");
             return false;

@@ -2,6 +2,7 @@ package com.gateway.api_gateway.service;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,48 +15,42 @@ import java.util.Date;
 
 @Service
 public class JwtService {
+
     @Value("${jwt.secret}")
-    private String secret="a-string-secret-at-least-256-bits-long";
+    private String secret;
 
     @Value("${jwt.expiration.ms}")
-    private Long expirationMs;
+    private long expirationMs;
 
-    //creates the secret key
-    public Key key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    //generate Jwt Token
-    public String generateToken(String Username){
-        Date now=new Date();
-        Date expiry=new Date(now.getTime()+expirationMs);
+    public String generateToken(String username) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expirationMs);
         return Jwts.builder()
-                .subject(Username)
-                .issuedAt(now)
-                .expiration(expiry)
-                .signWith((SecretKey) key())
-        .compact();
+                .setSubject(username)
+                .setIssuedAt(now)
+                .setExpiration(expiry)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
     }
 
-    //extracts username from generated Jwt Token
-    public String extractUsername(String token){
+    public String extractUsername(String token) {
         return Jwts.parser()
-                .verifyWith((SecretKey) key())
+                .setSigningKey(getSigningKey())
                 .build()
-                .parseSignedClaims(token)
-                .getPayload()
+                .parseClaimsJws(token)
+                .getBody()
                 .getSubject();
     }
 
-    //validate the Jwt Token
-    public boolean validateToken(String token){
-        try{
-            Jwts.parser()
-                    .verifyWith((SecretKey) key())
-                    .build()
-                    .parseSignedClaims(token);;
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
             return true;
-        }catch (JwtException e){
+        } catch (JwtException e) {
             return false;
         }
     }

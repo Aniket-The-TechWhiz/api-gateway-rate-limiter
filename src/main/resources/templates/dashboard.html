@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>API Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .card { border: 1px solid #ccc; padding: 20px; margin: 10px; display: inline-block; }
+    </style>
+</head>
+<body>
+<h1>API Usage Analytics</h1>
+<div class="card">
+    <h3>Total Requests (last 24h)</h3>
+    <p id="totalRequests">Loading...</p>
+</div>
+<div class="card">
+    <h3>Top Users</h3>
+    <ul id="topUsers"></ul>
+</div>
+<canvas id="requestsChart" width="400" height="200"></canvas>
+
+<script>
+    fetch('/api/analytics/summary?hours=24')
+        .then(async res => {
+            if (!res.ok) {
+                const message = await res.text();
+                throw new Error(message || ('Request failed with status ' + res.status));
+            }
+            return res.json();
+        })
+        .then(data => {
+            document.getElementById('totalRequests').innerText = data.totalRequests;
+            const topUsersList = document.getElementById('topUsers');
+            topUsersList.innerHTML = '';
+            data.topUsers.forEach(user => {
+                const li = document.createElement('li');
+                li.innerText = user[0] + ': ' + user[1] + ' requests';
+                topUsersList.appendChild(li);
+            });
+        })
+        .catch(error => {
+            document.getElementById('totalRequests').innerText = 'Unable to load analytics';
+            const topUsersList = document.getElementById('topUsers');
+            topUsersList.innerHTML = '<li>' + error.message + '</li>';
+        });
+</script>
+</body>
+</html>
