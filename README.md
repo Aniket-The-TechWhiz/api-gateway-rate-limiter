@@ -109,14 +109,10 @@ sudo docker start redis-gateway && export DB_URL='<your-postgres-jdbc-url>' DB_U
 
 Add screenshots to a folder such as `docs/images/` and reference them here.
 
-Example:
-
-```md
 ![Dashboard](docs/images/1.png)
 ![Rate limiter](docs/images/2.png)
 ![Rate limiter](docs/images/3.png)
 ![Rate limiter](docs/images/4.png)
-```
 
 ## Notes
 
