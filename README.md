@@ -275,7 +275,7 @@ api-gateway/
 
 ![Dashboard](docs/images/1.png)
 
-*Dashboard showing request analytics.*
+*Database showing logs*
 
 ---
 
@@ -300,7 +300,7 @@ api-gateway/
 
 ![Analytics API response](docs/images/4.png)
 
-*Inspecting Redis token bucket values.*
+*429 result bucket is empty*
 
 ---
 
