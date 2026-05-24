@@ -1,49 +1,562 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>API Analytics Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Rate Limiter Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial; padding: 20px; }
-        .card { border: 1px solid #ccc; padding: 20px; margin: 10px; display: inline-block; }
+        :root {
+            --bg-a: #f6f8fb;
+            --bg-b: #e5eef7;
+            --ink: #10243a;
+            --accent: #0077b6;
+            --accent-soft: #7ec8e3;
+            --success: #1b8a5a;
+            --danger: #d64545;
+            --surface: #ffffff;
+            --shadow: 0 14px 40px rgba(16, 36, 58, 0.16);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 20% 10%, rgba(126, 200, 227, 0.35), transparent 35%),
+                radial-gradient(circle at 80% 20%, rgba(0, 119, 182, 0.18), transparent 30%),
+                linear-gradient(160deg, var(--bg-a), var(--bg-b));
+            padding: 24px;
+        }
+
+        .dashboard {
+            max-width: 980px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(16, 36, 58, 0.1);
+            border-radius: 22px;
+            box-shadow: var(--shadow);
+            padding: 28px;
+            display: grid;
+            gap: 24px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            letter-spacing: 0.4px;
+        }
+
+        .top {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .bucket-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bucket {
+            position: relative;
+            width: 220px;
+            height: 290px;
+            border: 4px solid #274861;
+            border-radius: 18px 18px 28px 28px;
+            background: linear-gradient(180deg, #fafdff, #d8e9f5);
+            box-shadow: inset 0 0 16px rgba(16, 36, 58, 0.12);
+            overflow: hidden;
+            padding: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 10px;
+        }
+
+        .bucket-label {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1d3b53;
+            color: #fff;
+            font-weight: 700;
+            padding: 4px 14px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            letter-spacing: 0.4px;
+        }
+
+        .tokens {
+            width: 100%;
+            margin-top: 34px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-content: flex-start;
+        }
+
+        .token {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 28%, #fff 5%, #f77b7b 28%, #c52d2d 100%);
+            box-shadow: 0 5px 10px rgba(197, 45, 45, 0.35);
+            color: #fff;
+            display: grid;
+            place-items: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            animation: popIn 240ms ease;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.6); opacity: 0.45; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .timer-panel {
+            border-radius: 18px;
+            background: linear-gradient(155deg, #0369a1, #0ea5e9);
+            color: #fff;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .timer-panel h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .clock {
+            width: 150px;
+            height: 150px;
+            margin: 14px auto 8px;
+            border-radius: 50%;
+            border: 4px solid rgba(255, 255, 255, 0.85);
+            position: relative;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.1));
+        }
+
+        .clock::before {
+            content: "";
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .hand {
+            position: absolute;
+            width: 4px;
+            height: 52px;
+            background: #fef3c7;
+            left: calc(50% - 2px);
+            bottom: 50%;
+            transform-origin: bottom center;
+            border-radius: 5px;
+            transition: transform 350ms linear;
+        }
+
+        .timer-value {
+            font-size: clamp(2rem, 5vw, 2.6rem);
+            font-weight: 700;
+            line-height: 1;
+            margin-top: 4px;
+        }
+
+        .timer-note {
+            margin-top: 6px;
+            font-size: 0.9rem;
+            color: #dbeafe;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .control-panel {
+            display: grid;
+            justify-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 999px;
+            padding: 11px 22px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+            transition: transform 120ms ease, filter 180ms ease;
+        }
+
+        .btn:hover { filter: brightness(1.08); }
+        .btn:active { transform: translateY(1px) scale(0.98); }
+
+        .btn-request { background: var(--accent); }
+        .btn-reset { background: var(--danger); }
+
+        .request-status {
+            min-height: 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #48627a;
+        }
+
+        .request-status.allowed { color: var(--success); }
+        .request-status.blocked { color: var(--danger); }
+
+        .analytics-panel {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(39, 72, 97, 0.15);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 8px 20px rgba(16, 36, 58, 0.08);
+            display: grid;
+            gap: 12px;
+        }
+
+        .analytics-panel h2 {
+            margin: 0;
+            font-size: 1.05rem;
+        }
+
+        .analytics-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .analytics-box {
+            background: #f7fbff;
+            border-radius: 14px;
+            padding: 12px;
+            border: 1px solid rgba(39, 72, 97, 0.1);
+        }
+
+        .analytics-box span {
+            display: block;
+            font-size: 0.85rem;
+            color: #48627a;
+            margin-bottom: 6px;
+        }
+
+        .analytics-box strong {
+            font-size: 1.25rem;
+        }
+
+        .analytics-list {
+            margin: 0;
+            padding-left: 18px;
+            display: grid;
+            gap: 6px;
+            color: #10243a;
+        }
+
+        .analytics-empty {
+            color: #48627a;
+            font-size: 0.95rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .stat {
+            background: var(--surface);
+            border: 1px solid rgba(39, 72, 97, 0.15);
+            border-radius: 14px;
+            padding: 14px 12px;
+            text-align: center;
+            box-shadow: 0 6px 16px rgba(16, 36, 58, 0.08);
+        }
+
+        .stat h3 {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #48627a;
+            font-weight: 600;
+        }
+
+        .stat p {
+            margin: 8px 0 0;
+            font-size: 1.7rem;
+            font-weight: 700;
+        }
+
+        @media (max-width: 860px) {
+            .top { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+        }
+
+        @media (max-width: 540px) {
+            body { padding: 14px; }
+            .dashboard { padding: 18px; }
+            .stats { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
-<h1>API Usage Analytics</h1>
-<div class="card">
-    <h3>Total Requests (last 24h)</h3>
-    <p id="totalRequests">Loading...</p>
+<div class="dashboard">
+    <h1>Token Bucket Rate Limiter</h1>
+
+    <div class="top">
+        <div class="bucket-wrap">
+            <div class="bucket" id="bucket">
+                <div class="bucket-label">Bucket</div>
+                <div class="tokens" id="tokens"></div>
+            </div>
+        </div>
+
+        <div class="timer-panel">
+            <h2>Auto Refill Timer</h2>
+            <div class="clock">
+                <div class="hand" id="clockHand"></div>
+            </div>
+            <div class="timer-value" id="timerValue">60</div>
+            <div class="timer-note" id="timerNote">Refill from backend settings</div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="controls">
+            <button class="btn btn-request" id="makeRequestBtn">Make Request</button>
+            <button class="btn btn-reset" id="resetBucketBtn">Reset Bucket</button>
+        </div>
+        <div class="request-status" id="requestStatus">Press Make Request to test rate limiting</div>
+    </div>
+
+    <div class="analytics-panel">
+        <h2>Analytics Summary</h2>
+        <div class="analytics-meta">
+            <div class="analytics-box">
+                <span>Total requests in the last 24 hours</span>
+                <strong id="analyticsTotalRequests">Loading...</strong>
+            </div>
+            <div class="analytics-box">
+                <span>Top users</span>
+                <div id="analyticsTopUsers" class="analytics-empty">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <h3>Available Tokens</h3>
+            <p id="availableTokens">0</p>
+        </div>
+        <div class="stat">
+            <h3>Total Requests</h3>
+            <p id="totalRequests">0</p>
+        </div>
+        <div class="stat">
+            <h3>Successful Requests</h3>
+            <p id="successfulRequests">0</p>
+        </div>
+        <div class="stat">
+            <h3>Blocked Requests</h3>
+            <p id="blockedRequests">0</p>
+        </div>
+    </div>
 </div>
-<div class="card">
-    <h3>Top Users</h3>
-    <ul id="topUsers"></ul>
-</div>
-<canvas id="requestsChart" width="400" height="200"></canvas>
 
 <script>
-    fetch('/api/analytics/summary?hours=24')
-        .then(async res => {
-            if (!res.ok) {
-                const message = await res.text();
-                throw new Error(message || ('Request failed with status ' + res.status));
-            }
-            return res.json();
-        })
-        .then(data => {
-            document.getElementById('totalRequests').innerText = data.totalRequests;
-            const topUsersList = document.getElementById('topUsers');
-            topUsersList.innerHTML = '';
-            data.topUsers.forEach(user => {
-                const li = document.createElement('li');
-                li.innerText = user[0] + ': ' + user[1] + ' requests';
-                topUsersList.appendChild(li);
-            });
-        })
-        .catch(error => {
-            document.getElementById('totalRequests').innerText = 'Unable to load analytics';
-            const topUsersList = document.getElementById('topUsers');
-            topUsersList.innerHTML = '<li>' + error.message + '</li>';
+    const config = {
+        capacity: 3,
+        refillSeconds: 60
+    };
+
+    const state = {
+        availableTokens: config.capacity,
+        totalRequests: 0,
+        successfulRequests: 0,
+        blockedRequests: 0,
+        remainingSeconds: config.refillSeconds,
+        refillAmount: 3,
+        initialized: true
+    };
+
+    const tokensEl = document.getElementById('tokens');
+    const availableTokensEl = document.getElementById('availableTokens');
+    const totalRequestsEl = document.getElementById('totalRequests');
+    const successfulRequestsEl = document.getElementById('successfulRequests');
+    const blockedRequestsEl = document.getElementById('blockedRequests');
+    const timerValueEl = document.getElementById('timerValue');
+    const clockHandEl = document.getElementById('clockHand');
+    const timerNoteEl = document.getElementById('timerNote');
+    const requestStatusEl = document.getElementById('requestStatus');
+    const analyticsTotalRequestsEl = document.getElementById('analyticsTotalRequests');
+    const analyticsTopUsersEl = document.getElementById('analyticsTopUsers');
+
+    function setRequestStatus(type, message) {
+        requestStatusEl.classList.remove('allowed', 'blocked');
+        if (type === 'allowed') {
+            requestStatusEl.classList.add('allowed');
+        }
+        if (type === 'blocked') {
+            requestStatusEl.classList.add('blocked');
+        }
+        requestStatusEl.textContent = message;
+    }
+
+    function renderTokens() {
+        tokensEl.innerHTML = '';
+        for (let i = 0; i < state.availableTokens; i++) {
+            const token = document.createElement('div');
+            token.className = 'token';
+            token.textContent = i + 1;
+            tokensEl.appendChild(token);
+        }
+    }
+
+    function renderStats() {
+        availableTokensEl.textContent = state.availableTokens;
+        totalRequestsEl.textContent = state.totalRequests;
+        successfulRequestsEl.textContent = state.successfulRequests;
+        blockedRequestsEl.textContent = state.blockedRequests;
+    }
+
+    function renderTimer() {
+        timerValueEl.textContent = state.remainingSeconds;
+        const progress = (config.refillSeconds - state.remainingSeconds) / Math.max(config.refillSeconds, 1);
+        const degrees = progress * 360;
+        clockHandEl.style.transform = `rotate(${degrees}deg)`;
+        timerNoteEl.textContent = `Refill ${state.refillAmount} token(s) every ${config.refillSeconds}s`;
+    }
+
+    function renderAll() {
+        renderTokens();
+        renderStats();
+        renderTimer();
+    }
+
+    function renderAnalytics(data) {
+        analyticsTotalRequestsEl.textContent = typeof data.totalRequests === 'number' ? data.totalRequests : '0';
+
+        const topUsers = Array.isArray(data.topUsers) ? data.topUsers : [];
+        if (topUsers.length === 0) {
+            analyticsTopUsersEl.className = 'analytics-empty';
+            analyticsTopUsersEl.textContent = 'No request history yet';
+            return;
+        }
+
+        analyticsTopUsersEl.className = 'analytics-list';
+        analyticsTopUsersEl.innerHTML = '';
+
+        topUsers.slice(0, 5).forEach((entry) => {
+            const item = document.createElement('div');
+            const userId = Array.isArray(entry) ? entry[0] : (entry.userId ?? entry.username ?? entry.name ?? 'unknown');
+            const requestCount = Array.isArray(entry) ? entry[1] : (entry.count ?? entry.totalRequests ?? entry[2] ?? 0);
+            item.textContent = `${userId}: ${requestCount}`;
+            analyticsTopUsersEl.appendChild(item);
         });
+    }
+
+    async function loadAnalytics() {
+        try {
+            const response = await fetch('/api/analytics/summary?hours=24');
+            if (!response.ok) {
+                throw new Error('Analytics fetch failed');
+            }
+            const data = await response.json();
+            renderAnalytics(data);
+        } catch (error) {
+            analyticsTotalRequestsEl.textContent = 'Unavailable';
+            analyticsTopUsersEl.className = 'analytics-empty';
+            analyticsTopUsersEl.textContent = 'Unable to load analytics summary';
+        }
+    }
+
+    async function recordAuditEvent(eventPath) {
+        try {
+            await fetch(eventPath, { method: 'POST' });
+        } catch (e) {
+            // Keep the frontend simulation working even if the backend audit call fails.
+        }
+    }
+
+    function tickClock() {
+        if (state.remainingSeconds > 0) {
+            state.remainingSeconds -= 1;
+            if (state.remainingSeconds > 0) {
+                renderTimer();
+                return;
+            }
+        }
+
+        if (state.availableTokens < config.capacity) {
+            state.availableTokens = Math.min(config.capacity, state.availableTokens + state.refillAmount);
+            setRequestStatus('allowed', `Refilled ${state.refillAmount} token(s)`);
+            renderTokens();
+            renderStats();
+        }
+
+        state.remainingSeconds = config.refillSeconds;
+        renderTimer();
+    }
+
+    function resetBucket() {
+        state.availableTokens = config.capacity;
+        state.remainingSeconds = config.refillSeconds;
+        state.totalRequests = 0;
+        state.successfulRequests = 0;
+        state.blockedRequests = 0;
+        setRequestStatus('allowed', 'Bucket reset to full capacity');
+        renderAll();
+    }
+
+    function makeRequest() {
+        state.totalRequests += 1;
+
+        if (state.availableTokens > 0) {
+            state.availableTokens -= 1;
+            state.successfulRequests += 1;
+            setRequestStatus('allowed', 'Allowed: token consumed from the bucket');
+        } else {
+            state.blockedRequests += 1;
+            setRequestStatus('blocked', 'Blocked (429): bucket is empty');
+        }
+
+        renderAll();
+        recordAuditEvent('/api/rate-limit-demo/audit/request');
+    }
+
+    document.getElementById('makeRequestBtn').addEventListener('click', async () => {
+        makeRequest();
+        loadAnalytics();
+    });
+
+    document.getElementById('resetBucketBtn').addEventListener('click', async () => {
+        resetBucket();
+        recordAuditEvent('/api/rate-limit-demo/audit/reset');
+        loadAnalytics();
+    });
+
+    renderAll();
+    loadAnalytics();
+    setInterval(tickClock, 1000);
 </script>
 </body>
 </html>

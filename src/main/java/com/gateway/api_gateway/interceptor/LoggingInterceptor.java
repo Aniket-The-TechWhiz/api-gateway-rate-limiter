@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 @Component
 public class LoggingInterceptor implements HandlerInterceptor {
 
+    private static final String BLOCKED_BY_RATE_LIMITER_ATTRIBUTE = "blockedByRateLimiter";
+
     @Autowired
     private LoggingService loggingService;
 
@@ -30,6 +32,14 @@ public class LoggingInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        if (Boolean.TRUE.equals(request.getAttribute(BLOCKED_BY_RATE_LIMITER_ATTRIBUTE))) {
+            return;
+        }
+
+        if (!isSuccessfulResponse(response.getStatus())) {
+            return;
+        }
+
         Object startTimeAttribute = request.getAttribute("logStartTime");
         long startTime = startTimeAttribute instanceof Long ? (Long) startTimeAttribute : System.currentTimeMillis();
         long duration = System.currentTimeMillis() - startTime;
@@ -60,9 +70,10 @@ public class LoggingInterceptor implements HandlerInterceptor {
         log.setResponseStatus(response.getStatus());
         log.setResponseTimeMs(duration);
         log.setTimestamp(LocalDateTime.now());
-        try {
-            loggingService.saveLog(log);
-        } catch (Exception ignored) {
-        }
+        loggingService.saveLog(log);
+    }
+
+    private boolean isSuccessfulResponse(int status) {
+        return status >= 200 && status < 300;
     }
 }
